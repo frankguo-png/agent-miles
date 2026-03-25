@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Agent Miles — Transfer Pricing Research</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <div class="app">
+
+    <!-- Header (full width, always visible) -->
+    <header class="header">
+      <div class="header-brand">
+        <div class="header-logo">
+          <span>A</span><span>G</span><span>E</span><span>N</span><span>T</span>
+          <span style="margin-left:8px">M</span><span>I</span><span>L</span><span>E</span><span>S</span>
+        </div>
+        <div class="header-badge">Transfer Pricing Research</div>
+      </div>
+      <nav class="header-nav">
+        <button class="nav-btn active" data-page="chat">Chat</button>
+        <button class="nav-btn" data-page="documents">Documents</button>
+      </nav>
+    </header>
+
+    <!-- Body area below header -->
+    <div class="app-body">
+
+      <!-- Sidebar (only visible on chat page) -->
+      <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+          <button class="sidebar-toggle" onclick="toggleSidebar()" title="Toggle sidebar">☰</button>
+          <button class="new-chat-btn" onclick="newChat()">+ New Chat</button>
+        </div>
+        <div class="sidebar-label">Recents</div>
+        <div class="sidebar-chats" id="sidebar-chats"></div>
+      </aside>
+
+      <!-- Main Content -->
+      <main class="main">
+
+        <!-- Chat Page -->
+        <div id="page-chat" class="chat-container">
+          <div id="chat-messages" class="chat-messages">
+            <div id="chat-welcome" class="chat-welcome">
+              <canvas id="dot-grid" class="dot-grid-canvas"></canvas>
+              <div class="chat-welcome-icon"><img src="/static/logo.png" alt="Agent Miles"></div>
+              <h2>Ask Agent Miles</h2>
+              <p>Get instant, citation-backed answers to your transfer pricing questions — grounded entirely in your ingested documents.</p>
+              <div class="welcome-input-area">
+                <form id="welcome-form" class="chat-input-wrapper welcome-input-wrapper" onsubmit="event.preventDefault(); document.getElementById('chat-input').value = document.getElementById('welcome-input').value; document.getElementById('welcome-input').value=''; chatForm.dispatchEvent(new Event('submit'));">
+                  <textarea
+                    id="welcome-input"
+                    class="chat-input"
+                    placeholder="Ask a transfer pricing question..."
+                    rows="1"
+                    autocomplete="off"
+                  ></textarea>
+                  <button type="submit" class="chat-send-btn" title="Send message"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></button>
+                </form>
+              </div>
+              <div class="sample-questions">
+                <button class="sample-card" onclick="askSample(this)" data-question="What are the key factors to consider when selecting a transfer pricing method for intercompany services?">
+                  <span class="sample-card-title">TP Method Selection for Services</span>
+                  <span class="sample-card-desc">Key factors in choosing the right transfer pricing methodology</span>
+                </button>
+                <button class="sample-card" onclick="askSample(this)" data-question="What documentation is required to comply with transfer pricing regulations in the event of an audit?">
+                  <span class="sample-card-title">Audit Documentation Requirements</span>
+                  <span class="sample-card-desc">Compliance documentation standards under OECD and IRS rules</span>
+                </button>
+                <button class="sample-card" onclick="askSample(this)" data-question="How does the CUP method differ from the cost plus method?">
+                  <span class="sample-card-title">CUP vs Cost Plus Method</span>
+                  <span class="sample-card-desc">Compare two fundamental transfer pricing methodologies</span>
+                </button>
+                <button class="sample-card" onclick="askSample(this)" data-question="What is the arm's length principle and how should it be applied to intercompany loan transactions?">
+                  <span class="sample-card-title">Arm's Length for Loan Transactions</span>
+                  <span class="sample-card-desc">Applying the core TP principle to intercompany financing</span>
+                </button>
+              </div>
+            </div>
+          </div>
+          <div class="chat-input-area" id="chat-input-area">
+            <form id="chat-form" class="chat-input-wrapper">
+              <textarea
+                id="chat-input"
+                class="chat-input"
+                placeholder="Ask a transfer pricing question..."
+                rows="1"
+                autocomplete="off"
+              ></textarea>
+              <button type="submit" id="chat-send" class="chat-send-btn" title="Send message"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></button>
+            </form>
+          </div>
+        </div>
+
+        <!-- Documents Page -->
+        <div id="page-documents" class="hidden">
+          <div class="docs-header">
+            <h2>Documents</h2>
+            <div class="docs-header-actions">
+              <button class="btn btn-danger" id="btn-clear" onclick="clearDocuments()">Clear All</button>
+              <input type="file" id="file-upload" multiple accept=".pdf,.docx,.txt,.md" style="display:none" onchange="uploadFiles(this.files)">
+              <button class="btn btn-primary" id="btn-upload" onclick="document.getElementById('file-upload').click()">
+                <span id="upload-label">+ Add Documents</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="docs-card">
+            <div class="docs-card-header">
+              <div class="docs-search">
+                <span class="docs-search-icon">🔍</span>
+                <input type="text" id="docs-search" placeholder="Search documents..." oninput="filterDocuments()">
+              </div>
+              <span class="docs-count" id="docs-count"></span>
+            </div>
+            <div class="docs-list-header">
+              <span>Document</span>
+              <span style="text-align:center">Chunks</span>
+              <span>Ingested</span>
+              <span style="text-align:center">Status</span>
+              <span></span>
+            </div>
+            <div class="docs-list" id="docs-list"></div>
+          </div>
+        </div>
+
+      </main>
+    </div>
+  </div>
+
+  <!-- Document Preview Modal -->
+  <div class="drawer-overlay" id="drawer-overlay" onclick="closeDocPreview()"></div>
+  <div class="doc-preview" id="doc-preview">
+    <div class="doc-preview-header">
+      <div class="doc-preview-header-info">
+        <div class="doc-preview-icon" id="preview-icon">📄</div>
+        <div class="doc-preview-titles">
+          <h3 class="doc-preview-title" id="preview-title">Document</h3>
+          <span class="doc-preview-meta" id="preview-meta"></span>
+        </div>
+      </div>
+      <button class="doc-preview-close" onclick="closeDocPreview()">&times;</button>
+    </div>
+    <div class="doc-preview-body" id="preview-chunks"></div>
+  </div>
+
+  <!-- Toast Container -->
+  <div class="toast-container" id="toast-container"></div>
+
+  <script src="/static/dotgrid.js"></script>
+  <script src="/static/app.js"></script>
+</body>
+</html>

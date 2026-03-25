@@ -1,0 +1,10 @@
+chroma_db/
+.env
+.env.local
+__pycache__/
+chats/*.json
+documents/*.pdf
+documents/*.docx
+documents/*.txt
+documents/*.md
+!documents/.gitkeep
