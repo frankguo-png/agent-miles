@@ -66,7 +66,7 @@ def retrieve(question: str, top_k: int | None = None) -> list[dict]:
             name=config.COLLECTION_NAME,
             embedding_function=embedding_fn,
         )
-    except ValueError:
+    except Exception:
         return []
 
     results = collection.query(
