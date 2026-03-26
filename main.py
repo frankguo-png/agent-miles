@@ -13,6 +13,9 @@ from typing import Optional
 from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, Response, StreamingResponse
+from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request as StarletteRequest
 from pydantic import BaseModel
 import chromadb
 
@@ -28,6 +31,27 @@ app = FastAPI(
     description="Transfer pricing research chatbot with RAG-powered, citation-backed answers.",
     version="0.1.0",
 )
+
+# CORS — allow portal frontend to call our API
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+# Allow embedding in iframes (remove X-Frame-Options restriction)
+class AllowIframeMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: StarletteRequest, call_next):
+        response = await call_next(request)
+        response.headers["X-Frame-Options"] = "ALLOWALL"
+        response.headers["Content-Security-Policy"] = "frame-ancestors *"
+        return response
+
+
+app.add_middleware(AllowIframeMiddleware)
 
 # Serve static files
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
@@ -67,7 +91,15 @@ class DocumentInfo(BaseModel):
 
 
 @app.get("/")
-def root():
+def root(embed: str = ""):
+    if embed == "true":
+        # Rewrite all asset/API paths to go through the /miles/ proxy
+        html = (BASE_DIR / "static" / "index.html").read_text()
+        html = html.replace('href="/static/', 'href="/miles/static/')
+        html = html.replace('src="/static/', 'src="/miles/static/')
+        html = html.replace("fetch('/", "fetch('/miles/")
+        html = html.replace("fetch(`/", "fetch(`/miles/")
+        return Response(content=html, media_type="text/html")
     return FileResponse(BASE_DIR / "static" / "index.html")
 
 
@@ -146,14 +178,14 @@ def query_documents_stream(req: QueryRequest):
 @app.get("/documents", response_model=list[DocumentInfo])
 def list_documents():
     """List all ingested documents with metadata."""
-    client = chromadb.PersistentClient(path=config.CHROMA_PERSIST_DIR)
     try:
+        client = chromadb.PersistentClient(path=config.CHROMA_PERSIST_DIR)
         embedding_fn = get_embedding_function()
         collection = client.get_collection(
             name=config.COLLECTION_NAME,
             embedding_function=embedding_fn,
         )
-    except ValueError:
+    except Exception:
         return []
 
     # Get all metadata to build per-document summary
