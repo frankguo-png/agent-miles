@@ -16,7 +16,7 @@ def get_embedding_function():
             model_name=config.EMBEDDING_MODEL,
         )
 
-    # Fallback: free local model
-    from chromadb.utils.embedding_functions import SentenceTransformerEmbeddingFunction
-    print("No OpenAI API key found — using local sentence-transformers model.")
-    return SentenceTransformerEmbeddingFunction(model_name="all-MiniLM-L6-v2")
+    raise ValueError(
+        "OPENAI_API_KEY is required for embeddings. "
+        "Set it in your environment variables or .env file."
+    )
