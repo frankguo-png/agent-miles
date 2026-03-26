@@ -1,3 +1,6 @@
+// ── Base path (detects /miles/ proxy for portal embedding) ──
+const BASE = window.location.pathname.startsWith('/miles') ? '/miles' : '';
+
 // ── State ──
 let allDocuments = [];
 let currentChatId = null;
@@ -62,7 +65,7 @@ async function sendQuestion(question) {
   // Create chat if not already created (e.g. sample question click without new chat)
   if (!currentChatId) {
     try {
-      const res = await fetch('/chats', { method: 'POST' });
+      const res = await fetch(BASE + '/chats', { method: 'POST' });
       const data = await res.json();
       currentChatId = data.id;
       loadSidebar();
@@ -124,7 +127,7 @@ async function sendQuestion(question) {
   }, TICK_MS);
 
   try {
-    const res = await fetch('/query/stream', {
+    const res = await fetch(BASE + '/query/stream', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -219,7 +222,7 @@ function appendMessage(role, text, sources) {
   const div = document.createElement('div');
   div.className = `message ${role}`;
 
-  const avatarLabel = role === 'user' ? 'Y' : '<img src="/static/logo.png" alt="M">';
+  const avatarLabel = role === 'user' ? 'Y' : `<img src="${BASE}/static/logo.png" alt="M">`;
 
   // Format text: basic markdown-like rendering
   const formattedText = formatText(text);
@@ -280,7 +283,7 @@ function appendStreamingMessage() {
   const div = document.createElement('div');
   div.className = 'message assistant';
   div.innerHTML = `
-    <div class="message-avatar"><img src="/static/logo.png" alt="M"></div>
+    <div class="message-avatar"><img src="${BASE}/static/logo.png" alt="M"></div>
     <div class="message-content">
       <div class="message-text"><span class="typing-indicator"><span></span><span></span><span></span></span></div>
     </div>`;
@@ -392,16 +395,23 @@ function formatTextStreaming(text) {
 // ── Documents ──
 async function loadDocuments() {
   const list = document.getElementById('docs-list');
-  const count = document.getElementById('docs-count');
 
-  list.innerHTML = '<div class="empty-state"><div class="spinner"></div></div>';
+  // Show cached data instantly if available (no spinner flash)
+  if (allDocuments.length > 0) {
+    renderDocuments(allDocuments);
+  } else {
+    list.innerHTML = '<div class="empty-state"><div class="spinner"></div></div>';
+  }
 
+  // Fetch fresh data in background
   try {
-    const res = await fetch('/documents');
+    const res = await fetch(BASE + '/documents');
     allDocuments = await res.json();
     renderDocuments(allDocuments);
   } catch (err) {
-    list.innerHTML = `<div class="empty-state"><p>Failed to load documents.</p></div>`;
+    if (allDocuments.length === 0) {
+      list.innerHTML = `<div class="empty-state"><p>Failed to load documents.</p></div>`;
+    }
   }
 }
 
@@ -414,26 +424,37 @@ function renderDocuments(docs) {
   if (docs.length === 0) {
     list.innerHTML = `
       <div class="empty-state">
-        <div class="empty-state-icon">📁</div>
-        <h3>No documents ingested</h3>
-        <p>Place files in the ./documents/ folder and click "Ingest Documents" to get started.</p>
+        <h3>No documents yet</h3>
+        <p>Click "+ Add Documents" to get started.</p>
       </div>`;
     return;
   }
 
+  const fileIcon = (ext) => {
+    switch(ext) {
+      case 'pdf': return '<svg class="doc-icon doc-icon-pdf" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M9 15h6M9 18h4"/></svg>';
+      case 'docx': case 'doc': return '<svg class="doc-icon doc-icon-docx" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/></svg>';
+      default: return '<svg class="doc-icon doc-icon-txt" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>';
+    }
+  };
+
   list.innerHTML = docs.map(doc => {
-    const ext = doc.filename.split('.').pop().toUpperCase();
+    const ext = doc.filename.split('.').pop().toLowerCase();
     const date = doc.ingested_at && doc.ingested_at !== 'unknown'
       ? new Date(doc.ingested_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
       : '—';
     const fn = doc.filename.replace(/'/g, "\\'");
+    const chunkLabel = doc.chunk_count === 1 ? '1 chunk' : `${doc.chunk_count.toLocaleString()} chunks`;
     return `
       <div class="doc-row" onclick="openDocPreview('${fn}')">
-        <div>
-          <div class="doc-name">${doc.filename}</div>
-          <div class="doc-type">${ext}</div>
+        <div class="doc-name-cell">
+          ${fileIcon(ext)}
+          <div>
+            <div class="doc-name">${doc.filename}</div>
+            <div class="doc-type">${ext.toUpperCase()}</div>
+          </div>
         </div>
-        <div class="doc-chunks">${doc.chunk_count}</div>
+        <div class="doc-chunks">${chunkLabel}</div>
         <div class="doc-date">${date}</div>
         <div class="doc-status"><div class="status-dot"></div></div>
         <div><button class="doc-delete-btn" onclick="event.stopPropagation();deleteDocument('${fn}')" title="Remove document">×</button></div>
@@ -461,7 +482,7 @@ async function uploadFiles(fileList) {
   }
 
   try {
-    const res = await fetch('/upload', { method: 'POST', body: formData });
+    const res = await fetch(BASE + '/upload', { method: 'POST', body: formData });
     const data = await res.json();
 
     if (!res.ok) throw new Error(data.detail || 'Upload failed');
@@ -481,7 +502,7 @@ async function deleteDocument(filename) {
   if (!confirm(`Remove "${filename}"? The file and its chunks will be deleted.`)) return;
 
   try {
-    const res = await fetch(`/documents/${encodeURIComponent(filename)}`, { method: 'DELETE' });
+    const res = await fetch(`${BASE}/documents/${encodeURIComponent(filename)}`, { method: 'DELETE' });
     if (!res.ok) {
       const err = await res.json();
       throw new Error(err.detail || 'Delete failed');
@@ -500,7 +521,7 @@ async function clearDocuments() {
   btn.disabled = true;
 
   try {
-    await fetch('/documents', { method: 'DELETE' });
+    await fetch(BASE + '/documents', { method: 'DELETE' });
     showToast('All documents cleared.', 'info');
     allDocuments = [];
     renderDocuments([]);
@@ -531,7 +552,7 @@ async function openDocPreview(filename) {
   drawer.classList.add('open');
 
   try {
-    const res = await fetch(`/documents/${encodeURIComponent(filename)}/preview`);
+    const res = await fetch(`${BASE}/documents/${encodeURIComponent(filename)}/preview`);
     if (!res.ok) {
       const err = await res.json();
       throw new Error(err.detail || 'Failed to load preview');
@@ -608,7 +629,7 @@ async function openSourcePage(filename, page) {
   } else {
     // For text files, fetch the preview and show it
     try {
-      const res = await fetch(`/documents/${encodeURIComponent(filename)}/preview`);
+      const res = await fetch(`${BASE}/documents/${encodeURIComponent(filename)}/preview`);
       if (!res.ok) throw new Error('Failed to load');
       const data = await res.json();
       const escapedText = data.content
@@ -736,9 +757,9 @@ function startRenameChat(chatId, titleEl) {
     const newTitle = input.value.trim() || currentTitle;
     try {
       // Fetch current chat to get messages
-      const chatRes = await fetch(`/chats/${chatId}`);
+      const chatRes = await fetch(`${BASE}/chats/${chatId}`);
       const chatData = await chatRes.json();
-      await fetch(`/chats/${chatId}`, {
+      await fetch(`${BASE}/chats/${chatId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title: newTitle, messages: chatData.messages || [] }),
@@ -791,7 +812,7 @@ const welcomeHTML = document.getElementById('chat-welcome')?.outerHTML || '';
 async function loadSidebar() {
   const container = document.getElementById('sidebar-chats');
   try {
-    const res = await fetch('/chats');
+    const res = await fetch(BASE + '/chats');
     const chats = await res.json();
 
     if (chats.length === 0) {
@@ -836,7 +857,7 @@ async function newChat() {
 
 async function openChat(id) {
   try {
-    const res = await fetch(`/chats/${id}`);
+    const res = await fetch(`${BASE}/chats/${id}`);
     if (!res.ok) throw new Error('Chat not found');
     const data = await res.json();
 
@@ -873,7 +894,7 @@ async function openChat(id) {
 async function saveCurrentChat() {
   if (!currentChatId) return;
   try {
-    await fetch(`/chats/${currentChatId}`, {
+    await fetch(`${BASE}/chats/${currentChatId}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ messages: chatMessages_data }),
@@ -884,7 +905,7 @@ async function saveCurrentChat() {
 
 async function generateChatTitle(chatId, question, answer) {
   try {
-    const res = await fetch(`/chats/${chatId}/title`, {
+    const res = await fetch(`${BASE}/chats/${chatId}/title`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ question, answer }),
@@ -895,7 +916,7 @@ async function generateChatTitle(chatId, question, answer) {
 
 async function deleteChat(id) {
   try {
-    await fetch(`/chats/${id}`, { method: 'DELETE' });
+    await fetch(`${BASE}/chats/${id}`, { method: 'DELETE' });
     if (currentChatId === id) {
       currentChatId = null;
       chatMessages_data = [];
